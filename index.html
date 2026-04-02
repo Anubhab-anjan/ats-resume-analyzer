@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATS Resume Analyzer — AI-Powered Career Intelligence</title>
+  <meta name="description" content="Analyze your resume against any job description with AI. Get ATS scores, keyword matching, and actionable improvement suggestions." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ============================================
+       ROOT DESIGN TOKENS
+       ============================================ */
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #111118;
+      --bg-card: rgba(17, 17, 24, 0.7);
+      --bg-card-hover: rgba(25, 25, 38, 0.85);
+
+      --accent-cyan: #00e5ff;
+      --accent-purple: #a855f7;
+      --accent-magenta: #f43f9e;
+      --accent-emerald: #34d399;
+      --accent-amber: #fbbf24;
+      --accent-red: #ef4444;
+
+      --text-primary: #e8e8f0;
+      --text-secondary: #9898b0;
+      --text-muted: #5a5a72;
+
+      --glass-border: rgba(255, 255, 255, 0.06);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-xl: 28px;
+
+      --font-body: 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --shadow-glow-cyan: 0 0 30px rgba(0, 229, 255, 0.15);
+      --shadow-glow-purple: 0 0 30px rgba(168, 85, 247, 0.15);
+    }
+
+    /* ============================================
+       RESET & BASE
+       ============================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-body);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* ============================================
+       ANIMATED BACKGROUND
+       ============================================ */
+    #canvas-bg {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .bg-gradient-orbs {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .bg-gradient-orbs .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.3;
+      animation: orbFloat 20s ease-in-out infinite;
+    }
+    .bg-gradient-orbs .orb:nth-child(1) {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, var(--accent-purple), transparent 70%);
+      top: -10%; left: -5%;
+      animation-delay: 0s;
+    }
+    .bg-gradient-orbs .orb:nth-child(2) {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, var(--accent-cyan), transparent 70%);
+      bottom: -10%; right: -5%;
+      animation-delay: -7s;
+    }
+    .bg-gradient-orbs .orb:nth-child(3) {
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, var(--accent-magenta), transparent 70%);
+      top: 40%; left: 50%;
+      animation-delay: -14s;
+    }
+    @keyframes orbFloat {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -40px) scale(1.1); }
+      66% { transform: translate(-20px, 20px) scale(0.95); }
+    }
+
+    /* Grain effect overlay */
+    .grain-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    /* ============================================
+       LAYOUT
+       ============================================ */
+    .app-container {
+      position: relative;
+      z-index: 2;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px 60px;
+    }
+
+    /* ============================================
+       HEADER / BRANDING
+       ============================================ */
+    .brand-header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+    .brand-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .brand-logo .logo-icon {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 25px rgba(0, 229, 255, 0.3);
+      animation: logoPulse 3s ease-in-out infinite;
+    }
+    @keyframes logoPulse {
+      0%, 100% { box-shadow: 0 0 25px rgba(0, 229, 255, 0.3); }
+      50% { box-shadow: 0 0 40px rgba(168, 85, 247, 0.4); }
+    }
+    .brand-logo .logo-text {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .brand-tagline {
+      color: var(--text-secondary);
+      font-size: 15px;
+      font-weight: 400;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ============================================
+       WIZARD STEP INDICATOR
+       ============================================ */
+    .wizard-steps {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 44px;
+      position: relative;
+    }
+    .wizard-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: default;
+      position: relative;
+      z-index: 1;
+    }
+    .wizard-step .step-num {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      border: 2px solid var(--text-muted);
+      color: var(--text-muted);
+      background: var(--bg-primary);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .wizard-step .step-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: color 0.4s;
+      white-space: nowrap;
+    }
+    .wizard-step.active .step-num {
+      border-color: var(--accent-cyan);
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      color: #fff;
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.35);
+    }
+    .wizard-step.active .step-label { color: var(--text-primary); }
+    .wizard-step.done .step-num {
+      border-color: var(--accent-emerald);
+      background: var(--accent-emerald);
+      color: #fff;
+    }
+    .wizard-step.done .step-label { color: var(--accent-emerald); }
+
+    .wizard-connector {
+      width: 60px;
+      height: 2px;
+      background: var(--text-muted);
+      margin: 0 14px;
+      border-radius: 2px;
+      transition: background 0.4s;
+      position: relative;
+      overflow: hidden;
+    }
+    .wizard-connector.done {
+      background: var(--accent-emerald);
+    }
+    .wizard-connector.active-line {
+      background: linear-gradient(90deg, var(--accent-emerald), var(--accent-cyan));
+    }
+
+    /* ============================================
+       GLASS PANELS
+       ============================================ */
+    .glass-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 36px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .glass-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    }
+
+    /* ============================================
+       STEP PANELS (show/hide)
+       ============================================ */
+    .step-panel {
+      display: none;
+      animation: panelFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .step-panel.visible { display: block; }
+    @keyframes panelFadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ============================================
+       FORM ELEMENTS
+       ============================================ */
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title .icon {
+      font-size: 22px;
+    }
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    .form-group {
+      margin-bottom: 22px;
+    }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-input, .form-textarea {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+      outline: none;
+    }
+    .form-input::placeholder, .form-textarea::placeholder {
+      color: var(--text-muted);
+    }
+    .form-input:focus, .form-textarea:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.1);
+    }
+    .form-textarea {
+      resize: vertical;
+      min-height: 140px;
+      line-height: 1.7;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    /* ============================================
+       FILE DROP ZONE
+       ============================================ */
+    .drop-zone {
+      border: 2px dashed rgba(255,255,255,0.1);
+      border-radius: var(--radius-lg);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: rgba(255,255,255,0.015);
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 229, 255, 0.03);
+      box-shadow: inset 0 0 40px rgba(0, 229, 255, 0.05);
+    }
+    .drop-zone.has-file {
+      border-color: var(--accent-emerald);
+      background: rgba(52, 211, 153, 0.04);
+    }
+    .drop-zone .drop-icon {
+      font-size: 42px;
+      margin-bottom: 12px;
+      display: block;
+    }
+    .drop-zone .drop-text {
+      font-size: 15px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .drop-zone .drop-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .drop-zone .file-info {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--accent-emerald);
+      font-weight: 600;
+    }
+    .drop-zone.has-file .file-info { display: flex; }
+    .drop-zone.has-file .drop-default { display: none; }
+    #file-input { display: none; }
+
+    /* ============================================
+       BUTTONS
+       ============================================ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 0; height: 0;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50%;
+      transition: width 0.4s, height 0.4s, top 0.4s, left 0.4s;
+    }
+    .btn:active::after {
+      width: 300px; height: 300px;
+      top: calc(50% - 150px);
+      left: calc(50% - 150px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(0, 229, 255, 0.25);
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0, 229, 255, 0.35);
+    }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .btn-ghost:hover {
+      border-color: rgba(255,255,255,0.2);
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .btn-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 28px;
+      gap: 12px;
+    }
+    .btn-row--right { justify-content: flex-end; }
+
+    /* ============================================
+       LOADING SCREEN
+       ============================================ */
+    .loading-panel {
+      text-align: center;
+      padding: 80px 36px;
+    }
+    .loading-panel .scanner {
+      width: 120px; height: 120px;
+      margin: 0 auto 32px;
+      position: relative;
+    }
+    .loading-panel .scanner .ring {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      border: 2px solid transparent;
+    }
+    .loading-panel .scanner .ring:nth-child(1) {
+      border-top-color: var(--accent-cyan);
+      animation: scanSpin 1.2s linear infinite;
+    }
+    .loading-panel .scanner .ring:nth-child(2) {
+      border-right-color: var(--accent-purple);
+      animation: scanSpin 1.8s linear infinite reverse;
+      top: 10px; left: 10px;
+      width: calc(100% - 20px);
+      height: calc(100% - 20px);
+    }
+    .loading-panel .scanner .ring:nth-child(3) {
+      border-bottom-color: var(--accent-magenta);
+      animation: scanSpin 2.4s linear infinite;
+      top: 20px; left: 20px;
+      width: calc(100% - 40px);
+      height: calc(100% - 40px);
+    }
+    .loading-panel .scanner .core {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 28px;
+      animation: corePulse 1.5s ease-in-out infinite;
+    }
+    @keyframes scanSpin { to { transform: rotate(360deg); } }
+    @keyframes corePulse {
+      0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.85); }
+    }
+    .loading-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .loading-subtitle {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .loading-steps {
+      list-style: none;
+      max-width: 280px;
+      margin: 24px auto 0;
+      text-align: left;
+    }
+    .loading-steps li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 13px;
+      color: var(--text-muted);
+      transition: color 0.3s;
+    }
+    .loading-steps li.active {
+      color: var(--accent-cyan);
+    }
+    .loading-steps li.done {
+      color: var(--accent-emerald);
+    }
+
+    /* ============================================
+       RESULTS DASHBOARD
+       ============================================ */
+    .results-header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .results-header h2 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .results-header p {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* Score Ring */
+    .score-hero {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    .score-ring-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+    }
+    .score-ring-container svg {
+      width: 200px;
+      height: 200px;
+      transform: rotate(-90deg);
+    }
+    .score-ring-container .ring-track {
+      fill: none;
+      stroke: rgba(255,255,255,0.05);
+      stroke-width: 10;
+    }
+    .score-ring-container .ring-progress {
+      fill: none;
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 534;
+      stroke-dashoffset: 534;
+      transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .score-ring-container .ring-glow {
+      fill: none;
+      stroke-width: 14;
+      stroke-linecap: round;
+      stroke-dasharray: 534;
+      stroke-dashoffset: 534;
+      opacity: 0.3;
+      filter: blur(6px);
+      transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .score-center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .score-value {
+      font-size: 52px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -2px;
+    }
+    .score-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Sub-scores */
+    .sub-scores {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+    .sub-score-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      text-align: center;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .sub-score-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .sub-score-value {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .sub-score-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .sub-score-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+    .sub-score-bar .fill {
+      height: 100%;
+      border-radius: 2px;
+      width: 0%;
+      transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Keywords */
+    .keywords-section {
+      margin-bottom: 32px;
+    }
+    .keywords-section h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .keywords-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .kw-chip {
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      letter-spacing: 0.3px;
+      animation: chipFadeIn 0.4s ease forwards;
+      opacity: 0;
+    }
+    @keyframes chipFadeIn {
+      to { opacity: 1; }
+    }
+    .kw-chip.matched {
+      background: rgba(52, 211, 153, 0.12);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+      color: var(--accent-emerald);
+    }
+    .kw-chip.missing {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: var(--accent-red);
+    }
+
+    /* Suggestions */
+    .suggestions-section {
+      margin-bottom: 32px;
+    }
+    .suggestions-section h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .suggestion-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      transition: transform 0.2s;
+      animation: sugFadeUp 0.4s ease forwards;
+      opacity: 0;
+    }
+    @keyframes sugFadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .suggestion-card:hover { transform: translateX(4px); }
+    .suggestion-priority {
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .suggestion-priority.high {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+    }
+    .suggestion-priority.medium {
+      background: rgba(251, 191, 36, 0.15);
+      color: var(--accent-amber);
+    }
+    .suggestion-priority.low {
+      background: rgba(52, 211, 153, 0.12);
+      color: var(--accent-emerald);
+    }
+    .suggestion-body .sug-cat {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+    .suggestion-body .sug-msg {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Summary */
+    .summary-section {
+      margin-bottom: 32px;
+    }
+    .summary-section h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .summary-text {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.8;
+      border-left: 3px solid var(--accent-purple);
+    }
+
+    /* ============================================
+       ERROR BANNER
+       ============================================ */
+    .error-banner {
+      display: none;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      color: var(--accent-red);
+      font-size: 13px;
+      margin-bottom: 20px;
+      align-items: center;
+      gap: 10px;
+    }
+    .error-banner.visible { display: flex; }
+
+    /* ============================================
+       FILE STATS
+       ============================================ */
+    .file-stats {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .file-stats.visible { display: grid; }
+    .file-stat {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      text-align: center;
+    }
+    .file-stat .stat-val {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--accent-cyan);
+    }
+    .file-stat .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ============================================
+       RESPONSIVE
+       ============================================ */
+    @media (max-width: 640px) {
+      .form-row { grid-template-columns: 1fr; }
+      .sub-scores { grid-template-columns: 1fr; }
+      .wizard-connector { width: 24px; margin: 0 6px; }
+      .wizard-step .step-label { display: none; }
+      .glass-panel { padding: 24px 18px; }
+      .app-container { padding: 24px 14px; }
+      .brand-logo .logo-text { font-size: 22px; }
+      .score-ring-container { width: 160px; height: 160px; }
+      .score-ring-container svg { width: 160px; height: 160px; }
+      .score-value { font-size: 42px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Animated background -->
+  <canvas id="canvas-bg"></canvas>
+  <div class="bg-gradient-orbs">
+    <div class="orb"></div>
+    <div class="orb"></div>
+    <div class="orb"></div>
+  </div>
+  <div class="grain-overlay"></div>
+
+  <div class="app-container">
+    <!-- 🧬 HEADER -->
+    <header class="brand-header">
+      <div class="brand-logo">
+        <div class="logo-icon">🧬</div>
+        <span class="logo-text">ResumeX</span>
+      </div>
+      <p class="brand-tagline">AI-powered resume intelligence — decode what ATS systems really look for</p>
+    </header>
+
+    <!-- 🧭 WIZARD STEPS -->
+    <nav class="wizard-steps" id="wizard-nav">
+      <div class="wizard-step active" data-step="1">
+        <div class="step-num">1</div>
+        <span class="step-label">Upload</span>
+      </div>
+      <div class="wizard-connector" id="conn-1-2"></div>
+      <div class="wizard-step" data-step="2">
+        <div class="step-num">2</div>
+        <span class="step-label">Job Details</span>
+      </div>
+      <div class="wizard-connector" id="conn-2-3"></div>
+      <div class="wizard-step" data-step="3">
+        <div class="step-num">3</div>
+        <span class="step-label">Results</span>
+      </div>
+    </nav>
+
+    <!-- ─── STEP 1: Upload ─── -->
+    <section class="step-panel visible" id="step-1">
+      <div class="glass-panel">
+        <h2 class="section-title"><span class="icon">📄</span> Upload Your Resume</h2>
+        <p class="section-desc">Drop your PDF resume below. We'll extract the text and prepare it for AI analysis.</p>
+
+        <div class="error-banner" id="upload-error">
+          <span>⚠️</span>
+          <span id="upload-error-msg"></span>
+        </div>
+
+        <div class="drop-zone" id="drop-zone">
+          <input type="file" id="file-input" accept=".pdf" />
+          <div class="drop-default">
+            <span class="drop-icon">📎</span>
+            <div class="drop-text">Drag &amp; drop your resume here</div>
+            <div class="drop-hint">or click to browse • PDF only • max 5 MB</div>
+          </div>
+          <div class="file-info">
+            <span>✅</span>
+            <span id="file-name">resume.pdf</span>
+          </div>
+        </div>
+
+        <div class="file-stats" id="file-stats">
+          <div class="file-stat">
+            <div class="stat-val" id="stat-words">0</div>
+            <div class="stat-label">Words</div>
+          </div>
+          <div class="file-stat">
+            <div class="stat-val" id="stat-chars">0</div>
+            <div class="stat-label">Characters</div>
+          </div>
+        </div>
+
+        <div class="btn-row btn-row--right">
+          <button class="btn btn-primary" id="btn-to-step2" disabled>
+            Continue <span>→</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── STEP 2: Job Details ─── -->
+    <section class="step-panel" id="step-2">
+      <div class="glass-panel">
+        <h2 class="section-title"><span class="icon">💼</span> Target Position</h2>
+        <p class="section-desc">Tell us about the role you're applying for so we can calibrate the analysis.</p>
+
+        <div class="error-banner" id="analyze-error">
+          <span>⚠️</span>
+          <span id="analyze-error-msg"></span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="company-name">Company Name</label>
+            <input type="text" class="form-input" id="company-name" placeholder="e.g. Google, Stripe, Shopify" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="role-name">Role / Position</label>
+            <input type="text" class="form-input" id="role-name" placeholder="e.g. Senior Frontend Engineer" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="job-desc">Job Description</label>
+          <textarea class="form-textarea" id="job-desc" placeholder="Paste the full job description here..."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="btn-back-1">← Back</button>
+          <button class="btn btn-primary" id="btn-analyze">
+            🔍 Analyze Resume
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── LOADING ─── -->
+    <section class="step-panel" id="step-loading">
+      <div class="glass-panel loading-panel">
+        <div class="scanner">
+          <div class="ring"></div>
+          <div class="ring"></div>
+          <div class="ring"></div>
+          <div class="core">🧠</div>
+        </div>
+        <div class="loading-title">Analyzing Your Resume</div>
+        <div class="loading-subtitle">Our AI is decoding your resume against the job requirements</div>
+        <ul class="loading-steps" id="loading-steps">
+          <li class="active" id="ls-1"><span>⏳</span> Extracting keywords from job description</li>
+          <li id="ls-2"><span>⏳</span> Matching skills against your resume</li>
+          <li id="ls-3"><span>⏳</span> Scoring ATS compatibility</li>
+          <li id="ls-4"><span>⏳</span> Generating improvement suggestions</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ─── STEP 3: Results ─── -->
+    <section class="step-panel" id="step-3">
+      <div class="glass-panel">
+        <div class="results-header">
+          <h2>📊 Analysis Complete</h2>
+          <p>Here's how your resume stacks up against the target role</p>
+        </div>
+
+        <!-- Main Score Ring -->
+        <div class="score-hero">
+          <div class="score-ring-container">
+            <svg viewBox="0 0 180 180">
+              <circle class="ring-track" cx="90" cy="90" r="85" />
+              <circle class="ring-glow" id="ring-glow" cx="90" cy="90" r="85" />
+              <circle class="ring-progress" id="ring-progress" cx="90" cy="90" r="85" />
+            </svg>
+            <div class="score-center">
+              <div class="score-value" id="ats-score-val">0</div>
+              <div class="score-label">ATS Score</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sub Scores -->
+        <div class="sub-scores">
+          <div class="sub-score-card" id="card-keyword">
+            <div class="sub-score-value" id="keyword-score" style="color: var(--accent-cyan)">0</div>
+            <div class="sub-score-label">Keyword Match</div>
+            <div class="sub-score-bar"><div class="fill" id="bar-keyword" style="background: var(--accent-cyan)"></div></div>
+          </div>
+          <div class="sub-score-card" id="card-format">
+            <div class="sub-score-value" id="format-score" style="color: var(--accent-purple)">0</div>
+            <div class="sub-score-label">Format Score</div>
+            <div class="sub-score-bar"><div class="fill" id="bar-format" style="background: var(--accent-purple)"></div></div>
+          </div>
+          <div class="sub-score-card" id="card-experience">
+            <div class="sub-score-value" id="experience-score" style="color: var(--accent-magenta)">0</div>
+            <div class="sub-score-label">Experience Match</div>
+            <div class="sub-score-bar"><div class="fill" id="bar-experience" style="background: var(--accent-magenta)"></div></div>
+          </div>
+        </div>
+
+        <!-- Keywords -->
+        <div class="keywords-section" id="matched-kw-section">
+          <h3><span>✅</span> Matched Keywords</h3>
+          <div class="keywords-grid" id="matched-keywords"></div>
+        </div>
+        <div class="keywords-section" id="missing-kw-section">
+          <h3><span>❌</span> Missing Keywords</h3>
+          <div class="keywords-grid" id="missing-keywords"></div>
+        </div>
+
+        <!-- Suggestions -->
+        <div class="suggestions-section" id="suggestions-section">
+          <h3><span>💡</span> Improvement Suggestions</h3>
+          <div id="suggestions-list"></div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-section">
+          <h3><span>📝</span> Summary</h3>
+          <div class="summary-text" id="summary-text"></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="btn-start-over">← Start Over</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // ── Particle canvas background ──
+    const canvas = document.getElementById('canvas-bg');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    const PARTICLE_COUNT = 60;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Particle {
+      constructor() { this.reset(); }
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 0.5;
+        this.speedX = (Math.random() - 0.5) * 0.3;
+        this.speedY = (Math.random() - 0.5) * 0.3;
+        this.opacity = Math.random() * 0.4 + 0.1;
+        this.hue = Math.random() > 0.5 ? 186 : 270; // cyan or purple
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+      }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${this.hue}, 80%, 65%, ${this.opacity})`;
+        ctx.fill();
+      }
+    }
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(new Particle());
+
+    function drawLines() {
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 140) {
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(100, 180, 255, ${0.06 * (1 - dist / 140)})`;
+            ctx.lineWidth = 0.5;
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => { p.update(); p.draw(); });
+      drawLines();
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    // ── DOM refs ──
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const btnStep2 = document.getElementById('btn-to-step2');
+    const btnBack1 = document.getElementById('btn-back-1');
+    const btnAnalyze = document.getElementById('btn-analyze');
+    const btnStartOver = document.getElementById('btn-start-over');
+
+    let resumeText = '';
+    let currentStep = 1;
+
+    // ── Wizard navigation ──
+    function goToStep(step) {
+      document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('visible'));
+      const target = step === 'loading' ? 'step-loading' : `step-${step}`;
+      document.getElementById(target).classList.add('visible');
+
+      // Update wizard indicators
+      document.querySelectorAll('.wizard-step').forEach(s => {
+        const sn = parseInt(s.dataset.step);
+        s.classList.remove('active', 'done');
+        if (step === 'loading' || step === 3) {
+          if (sn < 3) s.classList.add('done');
+          else if (sn === 3) s.classList.add('active');
+        } else {
+          if (sn < step) s.classList.add('done');
+          else if (sn === step) s.classList.add('active');
+        }
+      });
+
+      const conn12 = document.getElementById('conn-1-2');
+      const conn23 = document.getElementById('conn-2-3');
+      conn12.className = 'wizard-connector';
+      conn23.className = 'wizard-connector';
+
+      if (step >= 2 || step === 'loading') conn12.classList.add('done');
+      if (step === 3) conn23.classList.add('done');
+      if (step === 2) conn12.classList.add('active-line');
+      if (step === 'loading') conn23.classList.add('active-line');
+
+      if (typeof step === 'number') currentStep = step;
+    }
+
+    // ── File drop ──
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) handleFile(fileInput.files[0]);
+    });
+
+    function showError(bannerId, msgId, text) {
+      const b = document.getElementById(bannerId);
+      document.getElementById(msgId).textContent = text;
+      b.classList.add('visible');
+      setTimeout(() => b.classList.remove('visible'), 6000);
+    }
+
+    async function handleFile(file) {
+      const errBanner = document.getElementById('upload-error');
+      errBanner.classList.remove('visible');
+
+      if (!file.name.endsWith('.pdf')) {
+        showError('upload-error', 'upload-error-msg', 'Only PDF files are supported. Please upload a .pdf file.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showError('upload-error', 'upload-error-msg', 'File too large. Maximum size is 5 MB.');
+        return;
+      }
+
+      // Show uploading state
+      dropZone.classList.add('has-file');
+      document.getElementById('file-name').textContent = `⏳ Uploading ${file.name}...`;
+      btnStep2.disabled = true;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/upload-resume', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Upload failed');
+        }
+        const data = await res.json();
+        resumeText = data.resume_text;
+
+        document.getElementById('file-name').textContent = file.name;
+        document.getElementById('stat-words').textContent = data.word_count.toLocaleString();
+        document.getElementById('stat-chars').textContent = data.char_count.toLocaleString();
+        document.getElementById('file-stats').classList.add('visible');
+        btnStep2.disabled = false;
+      } catch (e) {
+        dropZone.classList.remove('has-file');
+        showError('upload-error', 'upload-error-msg', e.message);
+      }
+    }
+
+    btnStep2.addEventListener('click', () => goToStep(2));
+    btnBack1.addEventListener('click', () => goToStep(1));
+    btnStartOver.addEventListener('click', () => {
+      resumeText = '';
+      fileInput.value = '';
+      dropZone.classList.remove('has-file');
+      document.getElementById('file-stats').classList.remove('visible');
+      btnStep2.disabled = true;
+      document.getElementById('company-name').value = '';
+      document.getElementById('role-name').value = '';
+      document.getElementById('job-desc').value = '';
+      goToStep(1);
+    });
+
+    // ── Loading step animation ──
+    function animateLoadingSteps() {
+      const steps = document.querySelectorAll('#loading-steps li');
+      steps.forEach(s => { s.classList.remove('active', 'done'); s.querySelector('span').textContent = '⏳'; });
+
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i > 0) {
+          steps[i - 1].classList.remove('active');
+          steps[i - 1].classList.add('done');
+          steps[i - 1].querySelector('span').textContent = '✅';
+        }
+        if (i < steps.length) {
+          steps[i].classList.add('active');
+          steps[i].querySelector('span').textContent = '⏳';
+          i++;
+        } else {
+          clearInterval(interval);
+        }
+      }, 2000);
+      return interval;
+    }
+
+    // ── Analyze ──
+    btnAnalyze.addEventListener('click', async () => {
+      const company = document.getElementById('company-name').value.trim();
+      const role = document.getElementById('role-name').value.trim();
+      const jobDesc = document.getElementById('job-desc').value.trim();
+
+      if (!company || !role || !jobDesc) {
+        showError('analyze-error', 'analyze-error-msg', 'Please fill in all fields — company, role, and job description.');
+        return;
+      }
+
+      goToStep('loading');
+      const loadingInterval = animateLoadingSteps();
+
+      try {
+        const res = await fetch('/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            resume_text: resumeText,
+            job_description: jobDesc,
+            company_name: company,
+            role: role
+          })
+        });
+
+        clearInterval(loadingInterval);
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Analysis failed');
+        }
+
+        const data = await res.json();
+        renderResults(data);
+        goToStep(3);
+      } catch (e) {
+        clearInterval(loadingInterval);
+        goToStep(2);
+        showError('analyze-error', 'analyze-error-msg', e.message);
+      }
+    });
+
+    // ── Render Results ──
+    function getScoreColor(score) {
+      if (score >= 80) return 'var(--accent-emerald)';
+      if (score >= 60) return 'var(--accent-cyan)';
+      if (score >= 40) return 'var(--accent-amber)';
+      return 'var(--accent-red)';
+    }
+
+    function animateNumber(el, target, duration = 1200) {
+      let start = 0;
+      const startTime = performance.now();
+      function tick(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        const current = Math.round(eased * target);
+        el.textContent = current;
+        if (progress < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function renderResults(data) {
+      const atsScore = data.ats_score;
+      const color = getScoreColor(atsScore);
+
+      // Score ring
+      const circumference = 2 * Math.PI * 85; // ~534
+      const offset = circumference - (atsScore / 100) * circumference;
+      const ringProgress = document.getElementById('ring-progress');
+      const ringGlow = document.getElementById('ring-glow');
+      ringProgress.style.stroke = color;
+      ringGlow.style.stroke = color;
+
+      // Reset then animate
+      ringProgress.style.strokeDashoffset = circumference;
+      ringGlow.style.strokeDashoffset = circumference;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          ringProgress.style.strokeDashoffset = offset;
+          ringGlow.style.strokeDashoffset = offset;
+        });
+      });
+
+      const scoreVal = document.getElementById('ats-score-val');
+      scoreVal.style.color = color;
+      animateNumber(scoreVal, atsScore);
+
+      // Sub scores
+      const subs = [
+        { id: 'keyword', val: data.keyword_match, barId: 'bar-keyword' },
+        { id: 'format', val: data.format_score, barId: 'bar-format' },
+        { id: 'experience', val: data.experience_match, barId: 'bar-experience' }
+      ];
+      subs.forEach(s => {
+        const el = document.getElementById(`${s.id}-score`);
+        animateNumber(el, s.val);
+        setTimeout(() => {
+          document.getElementById(s.barId).style.width = `${s.val}%`;
+        }, 100);
+      });
+
+      // Matched keywords
+      const matchedGrid = document.getElementById('matched-keywords');
+      matchedGrid.innerHTML = '';
+      (data.matched_keywords || []).forEach((kw, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'kw-chip matched';
+        chip.textContent = kw;
+        chip.style.animationDelay = `${i * 0.05}s`;
+        matchedGrid.appendChild(chip);
+      });
+      document.getElementById('matched-kw-section').style.display = (data.matched_keywords || []).length ? '' : 'none';
+
+      // Missing keywords
+      const missingGrid = document.getElementById('missing-keywords');
+      missingGrid.innerHTML = '';
+      (data.missing_keywords || []).forEach((kw, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'kw-chip missing';
+        chip.textContent = kw;
+        chip.style.animationDelay = `${i * 0.05}s`;
+        missingGrid.appendChild(chip);
+      });
+      document.getElementById('missing-kw-section').style.display = (data.missing_keywords || []).length ? '' : 'none';
+
+      // Suggestions
+      const sugList = document.getElementById('suggestions-list');
+      sugList.innerHTML = '';
+      (data.suggestions || []).forEach((sug, i) => {
+        const card = document.createElement('div');
+        card.className = 'suggestion-card';
+        card.style.animationDelay = `${i * 0.08}s`;
+        card.innerHTML = `
+          <span class="suggestion-priority ${sug.priority}">${sug.priority}</span>
+          <div class="suggestion-body">
+            <div class="sug-cat">${sug.category}</div>
+            <div class="sug-msg">${sug.message}</div>
+          </div>
+        `;
+        sugList.appendChild(card);
+      });
+
+      // Summary
+      document.getElementById('summary-text').textContent = data.summary || '';
+    }
+
+  })();
+  </script>
+</body>
+</html>

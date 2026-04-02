@@ -1,0 +1,25 @@
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables (contains API keys!)
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Pyright / Pyre
+.pyre/
+.pyre_configuration
+pyrightconfig.json
+
+# OS files
+Thumbs.db
+.DS_Store
