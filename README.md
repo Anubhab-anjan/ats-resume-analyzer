@@ -143,7 +143,7 @@ Open [http://localhost:8000](http://localhost:8000) in your browser.
 
 MIT — free to use, modify, and distribute.
 
---
+---
 
 <div align="center">
   <b>Built with ❤️ by Anubh</b>
