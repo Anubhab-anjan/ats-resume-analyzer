@@ -137,7 +137,7 @@ Open [http://localhost:8000](http://localhost:8000) in your browser.
 - **PDF Parsing:** pdfplumber
 - **Frontend:** Vanilla HTML/CSS/JS with canvas particle engine & glassmorphism design
 
----
+----
 
 ## 📄 License
 
